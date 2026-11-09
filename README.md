@@ -1,13 +1,19 @@
-# Sistema de Gestión de Inventario Multialmacén
+# Inventario Multialmacén de Distribuciones Dyno
 
-Distribuciones Dyno S.C.R.L. — Proyecto de Fin de Carrera, Ingeniería de Sistemas (UCSM).
+Aplicación web para gestionar las existencias de Distribuciones Dyno S.C.R.L.
+El catálogo de productos es compartido y cada almacén lleva su propio saldo.
+El sistema permite empezar con los almacenes O10, G9 e I7 y dar de alta más
+sucursales a medida que la empresa las necesite.
 
-Controla el stock de los almacenes de la empresa (O10, G9 e I7, y los que se agreguen):
-entradas, salidas, transferencias entre sucursales, ajustes con aprobación, Kardex
-valorizado por Promedio Ponderado, alertas de stock mínimo y reportes en PDF y Excel.
+## Operación de almacén
 
-**Alcance:** solo control de almacén. El sistema no registra ventas, comprobantes
-ni medios de pago (observación del asesor en las Prácticas 3 y 7).
+- Registrar entradas, salidas y transferencias entre sucursales.
+- Consultar el historial de movimientos y el Kardex valorizado por promedio ponderado.
+- Configurar el stock mínimo por producto y almacén y consultar alertas de reposición.
+- Solicitar ajustes de inventario para que el gerente los revise y apruebe o rechace.
+- Generar reportes de inventario en PDF y Excel.
+
+Proyecto de Fin de Carrera de Ingeniería de Sistemas, Universidad Católica de Santa María.
 
 ## Tecnología
 
@@ -38,19 +44,26 @@ db/__tests__/        Pruebas del modelo de datos sobre PostgreSQL (PGlite)
 
 ## Puesta en marcha
 
-Requiere Node.js 22.23 o superior.
+Requiere Node.js 22.23.4 o superior.
 
 1. En Supabase, ejecutar `db/schema.sql` y luego `db/seed_inicial.sql` en el SQL Editor.
 2. En **Authentication → Providers → Email**, desactivar *Allow new users to sign up*.
 3. Crear los usuarios en **Authentication → Users** y registrar su perfil
    (rol `GERENTE` o `ENCARGADO` con su sucursal) en la tabla `perfiles`.
-4. Copiar `.env.example` como `.env` y completar la URL y la clave anónima.
-5. Instalar y ejecutar:
+4. Copiar `.env.example` como `.env`. En `PUBLIC_SUPABASE_URL`, colocar la URL
+   del proyecto. En `PUBLIC_SUPABASE_ANON_KEY`, colocar la clave pública
+   de Supabase (publishable o anon).
+5. Instalar y ejecutar la aplicación.
 
 ```bash
 npm ci
 npm run dev
 ```
+
+Para habilitar la recuperación de contraseña en desarrollo, agrega
+`http://localhost:3000/restablecer-contrasena/` en
+**Authentication → URL Configuration → Redirect URLs** de Supabase. Usa la
+misma dirección y puerto con los que abres la aplicación en el navegador.
 
 ## Comandos
 
@@ -59,7 +72,7 @@ npm run dev
 | `npm run dev` | Servidor de desarrollo en el puerto 3000 |
 | `npm run lint` | Análisis estático (ESLint + reglas de SonarQube) |
 | `npm run typecheck` | Verificación de tipos con `astro check` |
-| `npm test` | Pruebas unitarias |
+| `npm test` | Pruebas unitarias y del esquema de base de datos |
 | `npm run test:coverage` | Pruebas con cobertura (mínimo 60 % en `src/lib`) |
 | `npm run build` | Compilación del sitio estático en `dist/` |
 
