@@ -9,7 +9,7 @@ import { calculateStock, currentAverageCost } from '../../lib/calculations';
 import { operableBranches } from '../../lib/permissions';
 import type { UserProfile } from '../../types';
 
-// Registro de entradas (RF-01) y salidas (RF-02). La salida se valoriza al
+// Registro de entradas (RF-01) y despachos (RF-02). El despacho se valoriza al
 // costo promedio vigente y no puede superar el stock de la sucursal (RF-07).
 export default function MovementModal({ profile, onClose }: { profile: UserProfile; onClose: () => void }) {
   const products = useStore($products).filter(p => p.active);
@@ -43,13 +43,13 @@ export default function MovementModal({ profile, onClose }: { profile: UserProfi
   };
 
   return (
-    <Modal isOpen onClose={onClose} title="Registrar entrada o salida">
+    <Modal isOpen onClose={onClose} title="Registrar entrada o despacho">
       <form onSubmit={handleSubmit} className="flex flex-col gap-5">
         <div className="grid grid-cols-2 gap-4">
           <Field label="Tipo" htmlFor="type">
             <select id="type" value={type} onChange={e => setType(e.target.value as 'ENTRADA' | 'SALIDA')} className={inputClass}>
               <option value="ENTRADA">Entrada (+)</option>
-              <option value="SALIDA">Salida (−)</option>
+              <option value="SALIDA">Despacho (−)</option>
             </select>
           </Field>
           <Field label="Sucursal" htmlFor="branch">
@@ -95,7 +95,7 @@ export default function MovementModal({ profile, onClose }: { profile: UserProfi
               <input id="cost" type="number" min="0" step="0.0001" required value={unitCost} onChange={e => setUnitCost(e.target.value)} className={inputClass} />
             </Field>
           ) : (
-            <Field label="Costo de salida" htmlFor="cost" hint="Se toma el costo promedio vigente">
+            <Field label="Costo unitario del despacho" htmlFor="cost" hint="Se toma el costo promedio vigente">
               <input id="cost" value={formatMoney(average, settings.currency)} readOnly className={inputClass} />
             </Field>
           )}

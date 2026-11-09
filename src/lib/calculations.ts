@@ -183,7 +183,7 @@ export function validateMovement(input: MovementInput, availableStock: number): 
 /**
  * Productos por debajo de su stock mínimo en cada sucursal (RF-05).
  * Si un producto no tiene mínimo propio en la sucursal, se usa el mínimo
- * por defecto de la configuración. Un producto en el mínimo no genera alerta.
+ * por defecto de la configuración. Un mínimo de cero desactiva la alerta.
  */
 export function getStockAlerts(
   products: Product[],
@@ -198,7 +198,7 @@ export function getStockAlerts(
       const own = minimums.find(m => m.productId === product.id && m.branchId === branch.id);
       const minimum = own ? own.quantity : defaultMinimum;
       const stock = calculateStock(movements, product.id, branch.id);
-      if (stock < minimum) alerts.push({ product, branch, stock, minimum });
+      if (minimum > 0 && stock <= minimum) alerts.push({ product, branch, stock, minimum });
     }
   }
   return alerts.sort((a, b) => a.stock - a.minimum - (b.stock - b.minimum));
@@ -230,7 +230,7 @@ export function nextProductCode(products: Pick<Product, 'code'>[], prefix = 'DY'
 /** Etiqueta legible del tipo de movimiento */
 export const MOVEMENT_LABELS: Record<MovementType, string> = {
   ENTRADA: 'Entrada',
-  SALIDA: 'Salida',
+  SALIDA: 'Despacho',
   TRANSFERENCIA_ENTRADA: 'Transferencia (ingreso)',
   TRANSFERENCIA_SALIDA: 'Transferencia (salida)',
   AJUSTE_ENTRADA: 'Ajuste (+)',

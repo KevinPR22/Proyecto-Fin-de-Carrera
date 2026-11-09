@@ -55,7 +55,7 @@ export default function MovementsTable({ profile }: { profile: UserProfile }) {
             onClick={() => setModal('movement')}
             className="flex items-center gap-2 bg-[#141414] px-5 py-2 text-sm font-semibold text-white hover:opacity-90"
           >
-            <ArrowDownLeft size={18} /> Entrada / salida
+            <ArrowDownLeft size={18} /> Entrada / despacho
           </button>
         </div>
       </div>

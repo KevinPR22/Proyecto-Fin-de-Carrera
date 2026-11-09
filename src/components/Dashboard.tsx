@@ -54,7 +54,7 @@ export default function Dashboard({ profile }: { profile: UserProfile }) {
         <StatCard
           title="Movimientos (7 días)"
           value={String(recentMovements)}
-          subtitle="Entradas, salidas, transferencias y ajustes"
+          subtitle="Entradas, despachos, transferencias y ajustes"
           icon={<ArrowLeftRight className="text-purple-600" />}
         />
         <StatCard

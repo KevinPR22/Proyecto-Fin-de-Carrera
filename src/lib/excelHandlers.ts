@@ -1,8 +1,8 @@
 import { readSheet } from 'read-excel-file/browser';
 import writeXlsxFile from 'write-excel-file/browser';
-import type { Branch, Category, Movement, Product } from '../types';
+import type { Branch, Category, Product } from '../types';
 import { mapExcelRowToProduct } from './mappers';
-import { buildMovementReport, buildStockReport, sheetToObjects } from './reportData';
+import { sheetToObjects, type MovementReportRow, type StockReportRow } from './reportData';
 
 // Importación y exportación a Excel en el navegador. Se reemplazó la
 // librería xlsx (SheetJS 0.18.5) por tener vulnerabilidades altas sin
@@ -22,14 +22,10 @@ export async function readProductsFromExcel(
 const header = (titles: string[]) => titles.map(value => ({ value, fontWeight: 'bold' as const }));
 
 export async function exportInventoryToExcel(
-  products: Product[],
+  stock: StockReportRow[],
   branches: Branch[],
-  movements: Movement[],
-  categories: Category[],
+  moves: MovementReportRow[],
 ): Promise<void> {
-  const stock = buildStockReport(products, branches, movements, categories);
-  const moves = buildMovementReport(movements, products, branches);
-
   const stockSheet = [
     header(['Código', 'Producto', 'Categoría', 'Unidad', ...branches.map(b => b.code), 'Total', 'Valor (PPP)']),
     ...stock.map(r => [r.code, r.name, r.category, r.unit, ...r.perBranch, r.total, r.value]),

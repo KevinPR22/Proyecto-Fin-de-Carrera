@@ -21,7 +21,7 @@ import NotificationContainer from './ui/Notification';
 export const TAB_TITLES: Record<TabType, string> = {
   dashboard: 'Resumen de almacenes',
   products: 'Catálogo de productos',
-  movements: 'Entradas, salidas y transferencias',
+  movements: 'Entradas, despachos y transferencias',
   kardex: 'Kardex valorizado',
   adjustments: 'Ajustes de inventario',
   reports: 'Reportes',

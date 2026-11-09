@@ -142,10 +142,16 @@ describe('Alertas de stock mínimo (RF-05)', () => {
     expect(alerts[0]).toMatchObject({ stock: 4, minimum: 5 });
   });
 
-  it('CP-10: producto en el mínimo no aparece en las alertas (stock 5, mínimo 5)', () => {
+  it('CP-10: producto en el mínimo aparece en las alertas (stock 5, mínimo 5)', () => {
     const movements = [mv('ENTRADA', 5, 1, O10.id)];
     const alerts = getStockAlerts([CINTA], [O10], movements, [{ productId: CINTA.id, branchId: O10.id, quantity: 5 }], 0);
-    expect(alerts).toHaveLength(0);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({ stock: 5, minimum: 5 });
+  });
+
+  it('un mínimo configurado en cero desactiva la alerta', () => {
+    const minimums = [{ productId: CINTA.id, branchId: O10.id, quantity: 0 }];
+    expect(getStockAlerts([CINTA], [O10], [], minimums, 10)).toHaveLength(0);
   });
 
   it('usa el mínimo por defecto cuando no hay mínimo propio', () => {
