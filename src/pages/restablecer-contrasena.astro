@@ -1,0 +1,99 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Restablecer contraseña - Inventario Multialmacén">
+  <main class="flex min-h-screen items-center justify-center bg-slate-100 p-4">
+    <div class="w-full max-w-md space-y-5 rounded-lg border border-slate-200 bg-white p-8 shadow-lg">
+      <h1 class="font-serif text-3xl font-bold italic">Restablecer contraseña</h1>
+      <p id="recovery-message" class="text-sm text-slate-700" role="status" aria-live="polite"></p>
+
+      <form id="recovery-request" method="post" class="space-y-3">
+        <label for="recovery-email" class="block text-sm font-semibold">Correo electrónico</label>
+        <input id="recovery-email" type="email" autocomplete="username" required class="w-full rounded-lg border px-4 py-2" />
+        <button type="submit" class="w-full rounded-lg bg-[#141414] py-3 font-semibold text-white disabled:opacity-50">
+          Enviar enlace de recuperación
+        </button>
+      </form>
+
+      <form id="recovery-update" method="post" class="space-y-3" hidden>
+        <label for="new-password" class="block text-sm font-semibold">Contraseña nueva</label>
+        <input id="new-password" type="password" autocomplete="new-password" minlength="6" required class="w-full rounded-lg border px-4 py-2" />
+        <label for="confirm-password" class="block text-sm font-semibold">Repite la contraseña</label>
+        <input id="confirm-password" type="password" autocomplete="new-password" minlength="6" required class="w-full rounded-lg border px-4 py-2" />
+        <button type="submit" class="w-full rounded-lg bg-[#141414] py-3 font-semibold text-white disabled:opacity-50">
+          Guardar contraseña
+        </button>
+      </form>
+
+      <a href="/login/" class="inline-block text-sm font-semibold underline">Volver al inicio de sesión</a>
+    </div>
+  </main>
+</Layout>
+
+<script>
+  import { supabase } from '../lib/supabaseClient';
+
+  const requestForm = document.querySelector<HTMLFormElement>('#recovery-request')!;
+  const updateForm = document.querySelector<HTMLFormElement>('#recovery-update')!;
+  const requestButton = requestForm.querySelector('button')!;
+  const updateButton = updateForm.querySelector('button')!;
+  const email = document.querySelector<HTMLInputElement>('#recovery-email')!;
+  const password = document.querySelector<HTMLInputElement>('#new-password')!;
+  const confirmation = document.querySelector<HTMLInputElement>('#confirm-password')!;
+  const message = document.querySelector('#recovery-message')!;
+
+  const fragment = new URLSearchParams(window.location.hash.slice(1));
+  if (fragment.has('error_code')) {
+    message.textContent = 'El enlace venció o ya se usó. Solicita uno nuevo.';
+    window.history.replaceState(null, '', window.location.pathname);
+  }
+
+  supabase.auth.onAuthStateChange(event => {
+    if (event === 'PASSWORD_RECOVERY') {
+      requestForm.hidden = true;
+      updateForm.hidden = false;
+      message.textContent = 'Elige una contraseña nueva para tu cuenta.';
+      password.focus();
+    }
+  });
+
+  requestForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    requestButton.disabled = true;
+    message.textContent = '';
+    try {
+      const redirectTo = new URL('/restablecer-contrasena/', window.location.origin).href;
+      const { error } = await supabase.auth.resetPasswordForEmail(email.value.trim(), { redirectTo });
+      message.textContent = error
+        ? 'No se pudo enviar el enlace. Intenta de nuevo más tarde.'
+        : 'Si existe una cuenta con ese correo, recibirás un enlace de recuperación.';
+    } finally {
+      requestButton.disabled = false;
+    }
+  });
+
+  updateForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (updateForm.hidden || updateButton.disabled) return;
+    if (password.value !== confirmation.value) {
+      message.textContent = 'Las contraseñas deben coincidir.';
+      confirmation.focus();
+      return;
+    }
+    updateButton.disabled = true;
+    try {
+      const { error } = await supabase.auth.updateUser({ password: password.value });
+      if (error) {
+        message.textContent = error.message;
+        return;
+      }
+      updateForm.reset();
+      updateForm.hidden = true;
+      message.textContent = 'Contraseña actualizada. Ya puedes volver al inicio de sesión.';
+      await supabase.auth.signOut({ scope: 'local' });
+    } finally {
+      updateButton.disabled = false;
+    }
+  });
+</script>

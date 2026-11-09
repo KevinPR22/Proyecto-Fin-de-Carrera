@@ -1,0 +1,91 @@
+import { useState } from 'react';
+import { useStore } from '@nanostores/react';
+import { motion } from 'motion/react';
+import { FileDown, FileSpreadsheet } from 'lucide-react';
+import { $categories, $movements, $products } from '../stores/inventoryStore';
+import { $branches } from '../stores/branchStore';
+import { $settings, formatMoney } from '../stores/settingsStore';
+import { buildMovementReport, buildStockReport } from '../lib/reportData';
+import type { UserProfile } from '../types';
+import ReportCard from './ui/ReportCard';
+
+// Reportes de almacén en PDF y Excel (RF-06): stock por sucursal valorizado
+// y movimientos por periodo. Se retiraron los rankings de "más vendidos".
+// Las librerías de PDF y Excel se cargan solo al exportar (import dinámico).
+export default function Reports({ profile }: { profile: UserProfile }) {
+  const products = useStore($products);
+  const categories = useStore($categories);
+  const movements = useStore($movements);
+  const allBranches = useStore($branches).filter(b => b.active);
+  const settings = useStore($settings);
+  const branches = profile.role === 'GERENTE' ? allBranches : allBranches.filter(b => b.id === profile.branchId);
+
+  const firstOfMonth = new Date();
+  firstOfMonth.setDate(1);
+  const [from, setFrom] = useState(firstOfMonth.toISOString().slice(0, 10));
+  const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
+  const [branchId, setBranchId] = useState(profile.role === 'GERENTE' ? '' : (profile.branchId ?? ''));
+
+  const fromDate = new Date(`${from}T00:00:00`);
+  const toDate = new Date(`${to}T23:59:59`);
+  const stock = buildStockReport(products, branches, movements, categories);
+  const period = buildMovementReport(movements, products, branches, fromDate, toDate, branchId || undefined);
+  const totalValue = stock.reduce((acc, r) => acc + r.value, 0);
+
+  return (
+    <motion.div key="reports" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="grid gap-6 lg:grid-cols-2">
+      <ReportCard title="Stock por sucursal" description="Saldo de cada producto por almacén y valor a costo promedio ponderado.">
+        <p className="mb-6 text-sm">
+          {stock.length} productos · Valor total <strong>{formatMoney(totalValue, settings.currency)}</strong>
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={async () => (await import('../lib/pdfExporter')).exportStockToPDF(products, branches, movements, categories)}
+            className="flex items-center gap-2 bg-[#141414] px-4 py-2 text-sm text-white"
+          >
+            <FileDown size={16} /> PDF
+          </button>
+          <button
+            type="button"
+            onClick={async () => (await import('../lib/excelHandlers')).exportInventoryToExcel(products, branches, movements, categories)}
+            className="flex items-center gap-2 border border-[#141414] px-4 py-2 text-sm"
+          >
+            <FileSpreadsheet size={16} /> Excel (stock y movimientos)
+          </button>
+        </div>
+      </ReportCard>
+
+      <ReportCard title="Movimientos por periodo" description="Entradas, salidas, transferencias y ajustes registrados entre dos fechas.">
+        <div className="mb-4 grid grid-cols-3 gap-2 text-sm">
+          <input aria-label="Desde" type="date" value={from} onChange={e => setFrom(e.target.value)} className="border border-[#141414] px-2 py-1" />
+          <input aria-label="Hasta" type="date" value={to} onChange={e => setTo(e.target.value)} className="border border-[#141414] px-2 py-1" />
+          <select
+            aria-label="Sucursal"
+            value={branchId}
+            disabled={profile.role !== 'GERENTE'}
+            onChange={e => setBranchId(e.target.value)}
+            className="border border-[#141414] px-2 py-1"
+          >
+            <option value="">Todas</option>
+            {branches.map(b => (
+              <option key={b.id} value={b.id}>
+                {b.code}
+              </option>
+            ))}
+          </select>
+        </div>
+        <p className="mb-6 text-sm">{period.length} movimientos en el periodo</p>
+        <button
+          type="button"
+          onClick={async () =>
+            (await import('../lib/pdfExporter')).exportMovementsToPDF(movements, products, branches, fromDate, toDate, branchId || undefined)
+          }
+          className="flex items-center gap-2 bg-[#141414] px-4 py-2 text-sm text-white"
+        >
+          <FileDown size={16} /> PDF
+        </button>
+      </ReportCard>
+    </motion.div>
+  );
+}

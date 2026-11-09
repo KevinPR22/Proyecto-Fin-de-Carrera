@@ -1,0 +1,48 @@
+# Integración continua: en cada push y pull request a main se ejecutan el
+# análisis estático, la verificación de tipos, las pruebas con cobertura y
+# la compilación. Si un paso falla, el cambio no se integra.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Análisis estático (ESLint + reglas SonarJS)
+        run: npm run lint
+
+      - name: Verificación de tipos
+        run: npm run typecheck
+
+      - name: Pruebas unitarias con cobertura (mínimo 60 %)
+        run: npm run test:coverage
+
+      - name: Auditoría de dependencias
+        run: npm audit --audit-level=high
+
+      - name: Compilación
+        run: npm run build
+        env:
+          PUBLIC_SUPABASE_URL: ${{ secrets.PUBLIC_SUPABASE_URL }}
+          PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.PUBLIC_SUPABASE_ANON_KEY }}
+
+      - name: Publicar artefacto de compilación
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
