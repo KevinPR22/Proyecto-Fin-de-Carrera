@@ -121,6 +121,12 @@ create index if not exists idx_movimientos_transferencia
 -- Funciones de apoyo
 -- =====================================================================
 
+-- Una sesión de Auth solo tiene acceso si su perfil está activo.
+create or replace function perfil_activo() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from perfiles where id = auth.uid() and activo);
+$$;
+
 -- Rol del usuario actual
 create or replace function es_gerente() returns boolean
 language sql stable security definer set search_path = public as $$
@@ -138,7 +144,7 @@ $$;
 -- ¿Puede el usuario operar en la sucursal indicada?
 create or replace function puede_operar(p_sucursal uuid) returns boolean
 language sql stable security definer set search_path = public as $$
-  select es_gerente() or sucursal_usuario() = p_sucursal;
+  select es_gerente() or coalesce(sucursal_usuario() = p_sucursal, false);
 $$;
 
 -- Stock actual de un producto en una sucursal
@@ -275,13 +281,13 @@ alter table ajustes      enable row level security;
 alter table movimientos  enable row level security;
 
 -- Lectura: cualquier usuario autenticado y activo
-create policy "lectura sucursales"   on sucursales   for select to authenticated using (true);
-create policy "lectura categorias"   on categorias   for select to authenticated using (true);
-create policy "lectura productos"    on productos    for select to authenticated using (true);
-create policy "lectura stock_minimo" on stock_minimo for select to authenticated using (true);
-create policy "lectura movimientos"  on movimientos  for select to authenticated using (true);
-create policy "lectura ajustes"      on ajustes      for select to authenticated using (true);
-create policy "lectura perfiles"     on perfiles     for select to authenticated using (true);
+create policy "lectura sucursales"   on sucursales   for select to authenticated using ((select perfil_activo()));
+create policy "lectura categorias"   on categorias   for select to authenticated using ((select perfil_activo()));
+create policy "lectura productos"    on productos    for select to authenticated using ((select perfil_activo()));
+create policy "lectura stock_minimo" on stock_minimo for select to authenticated using ((select perfil_activo()));
+create policy "lectura movimientos"  on movimientos  for select to authenticated using ((select perfil_activo()));
+create policy "lectura ajustes"      on ajustes      for select to authenticated using (puede_operar(id_sucursal));
+create policy "lectura perfiles"     on perfiles     for select to authenticated using ((select perfil_activo()));
 
 -- Sucursales y perfiles: solo el gerente administra
 create policy "gerente sucursales" on sucursales for all to authenticated
@@ -290,9 +296,10 @@ create policy "gerente perfiles" on perfiles for update to authenticated
   using (es_gerente()) with check (es_gerente());
 
 -- Catálogo: encargado y gerente registran y editan
-create policy "alta categorias" on categorias for insert to authenticated with check (true);
-create policy "alta productos" on productos for insert to authenticated with check (true);
-create policy "edicion productos" on productos for update to authenticated using (true) with check (true);
+create policy "alta categorias" on categorias for insert to authenticated with check ((select perfil_activo()));
+create policy "alta productos" on productos for insert to authenticated with check ((select perfil_activo()));
+create policy "edicion productos" on productos for update to authenticated
+  using ((select perfil_activo())) with check ((select perfil_activo()));
 create policy "stock minimo" on stock_minimo for all to authenticated
   using (puede_operar(id_sucursal)) with check (puede_operar(id_sucursal));
 
@@ -303,7 +310,11 @@ create policy "registro movimientos" on movimientos for insert to authenticated
 
 -- Ajustes: el usuario solicita en su sucursal; la revisión va por revisar_ajuste()
 create policy "solicitud ajustes" on ajustes for insert to authenticated
-  with check (puede_operar(id_sucursal) and estado = 'PENDIENTE');
+  with check (
+    puede_operar(id_sucursal) and estado = 'PENDIENTE'
+    and solicitado_por = (select auth.uid())
+    and revisado_por is null and revisado_en is null
+  );
 
 revoke update, delete on movimientos from anon, authenticated;
 revoke all on all tables in schema public from anon;

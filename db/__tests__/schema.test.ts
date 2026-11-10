@@ -7,6 +7,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 const GERENTE = '00000000-0000-0000-0000-000000000001';
 const ENCARGADO = '00000000-0000-0000-0000-000000000002';
+const INACTIVO = '00000000-0000-0000-0000-000000000003';
+const SIN_PERFIL = '00000000-0000-0000-0000-000000000004';
 const db = new PGlite();
 let P = '';
 let O10 = '';
@@ -15,6 +17,15 @@ let G9 = '';
 const one = async <T = Record<string, unknown>>(sql: string, params: unknown[] = []) =>
   (await db.query<T>(sql, params)).rows[0];
 const actAs = (uid: string) => db.query(`select set_config('app.uid', $1, false)`, [uid]);
+const asAuthenticated = async (uid: string, run: () => Promise<void>) => {
+  await db.exec('set role authenticated');
+  try {
+    await actAs(uid);
+    await run();
+  } finally {
+    await db.exec('reset role');
+  }
+};
 const stock = async (branch: string) =>
   Number((await one<{ s: string }>('select stock_actual($1, $2) s', [P, branch])).s);
 const insertMovement = (branch: string, tipo: string, cantidad: number, costo = 0) =>
@@ -45,6 +56,14 @@ beforeAll(async () => {
   P = (await one<{ id: string }>(`select id from productos where codigo = 'DY-001'`)).id;
   O10 = (await one<{ id: string }>(`select id from sucursales where codigo = 'O10'`)).id;
   G9 = (await one<{ id: string }>(`select id from sucursales where codigo = 'G9'`)).id;
+  await db.exec(`
+    insert into auth.users values ('${INACTIVO}', 'inactivo@dyno.pe'), ('${SIN_PERFIL}', 'sin-perfil@dyno.pe');
+    insert into perfiles (id, nombre, id_sucursal, activo) values ('${INACTIVO}', 'Inactivo', '${O10}', false);
+    grant usage on schema auth to authenticated;
+    grant select on all tables in schema public to authenticated;
+    grant insert on productos, ajustes to authenticated;
+    grant update on productos to authenticated;
+  `);
   await actAs(ENCARGADO);
 });
 
@@ -111,5 +130,48 @@ describe('Modelo de datos (db/schema.sql)', () => {
   it('BD-08: el Kardex no tiene políticas de modificación ni borrado', async () => {
     const rows = (await db.query<{ cmd: string }>(`select cmd from pg_policies where tablename = 'movimientos'`)).rows;
     expect(rows.map(r => r.cmd).sort()).toEqual(['INSERT', 'SELECT']);
+  });
+
+  it.each([INACTIVO, SIN_PERFIL])('BD-09: autenticarse sin perfil activo no da acceso al inventario (%s)', async uid => {
+    await asAuthenticated(uid, async () => {
+      for (const table of ['sucursales', 'categorias', 'productos', 'stock_minimo', 'movimientos', 'ajustes', 'perfiles']) {
+        expect((await db.query(`select * from ${table}`)).rows).toEqual([]);
+      }
+      await expect(db.query("insert into productos (codigo, nombre) values ('DENEGADO', 'No autorizado')"))
+        .rejects.toThrow(/row-level security/);
+      await expect(db.query('select registrar_transferencia($1, $2, $3, 1)', [P, O10, G9]))
+        .rejects.toThrow(/permiso/);
+    });
+  });
+
+  it('BD-10: el encargado ve el stock consolidado y solo los ajustes de su sucursal', async () => {
+    await actAs(GERENTE);
+    await db.query(
+      "insert into ajustes (id_producto, id_sucursal, tipo, cantidad, motivo) values ($1, $2, 'SALIDA', 1, 'Conteo en G9')",
+      [P, G9],
+    );
+    await asAuthenticated(ENCARGADO, async () => {
+      expect(await stock(G9)).toBe(30);
+      const result = await db.query('select distinct id_sucursal from ajustes');
+      expect(result.rows).toEqual([{ id_sucursal: O10 }]);
+    });
+    await asAuthenticated(GERENTE, async () => {
+      const result = await db.query<{ id_sucursal: string }>('select distinct id_sucursal from ajustes');
+      expect(result.rows.map(row => row.id_sucursal).sort()).toEqual([O10, G9].sort());
+    });
+  });
+
+  it('BD-11: el encargado no puede solicitar un ajuste a nombre de otro usuario', async () => {
+    await asAuthenticated(ENCARGADO, async () => {
+      await expect(db.query(
+        "insert into ajustes (id_producto, id_sucursal, tipo, cantidad, motivo, solicitado_por) values ($1, $2, 'SALIDA', 1, 'Conteo en O10', $3)",
+        [P, O10, GERENTE],
+      )).rejects.toThrow(/row-level security/);
+      const result = await db.query(
+        "insert into ajustes (id_producto, id_sucursal, tipo, cantidad, motivo) values ($1, $2, 'SALIDA', 1, 'Conteo en O10') returning solicitado_por",
+        [P, O10],
+      );
+      expect(result.rows).toEqual([{ solicitado_por: ENCARGADO }]);
+    });
   });
 });

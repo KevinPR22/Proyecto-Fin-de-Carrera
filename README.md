@@ -65,6 +65,10 @@ Para habilitar la recuperación de contraseña en desarrollo, agrega
 **Authentication → URL Configuration → Redirect URLs** de Supabase. Usa la
 misma dirección y puerto con los que abres la aplicación en el navegador.
 
+Si la base ya está instalada con una versión anterior, ejecuta
+[`db/migrations/001_permisos_de_inventario.sql`](db/migrations/001_permisos_de_inventario.sql)
+en el SQL Editor para actualizar los permisos conservando los datos.
+
 ## Comandos
 
 | Comando | Qué hace |
