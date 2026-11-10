@@ -100,7 +100,7 @@ export default function MovementModal({ profile, onClose }: { profile: UserProfi
             </Field>
           )}
         </div>
-        <Field label="Referencia" htmlFor="reference">
+        <Field label="Referencia (opcional)" htmlFor="reference">
           <input
             id="reference"
             value={reference}

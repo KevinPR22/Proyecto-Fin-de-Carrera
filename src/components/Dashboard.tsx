@@ -19,15 +19,16 @@ export default function Dashboard({ profile }: { profile: UserProfile }) {
   const pending = useStore($pendingAdjustments);
   const settings = useStore($settings);
 
-  const branches = allBranches.filter(
-    b => b.active && (profile.role === 'GERENTE' || b.id === profile.branchId),
+  const activeBranches = allBranches.filter(b => b.active);
+  const operatingBranches = activeBranches.filter(
+    b => profile.role === 'GERENTE' || b.id === profile.branchId,
   );
   const activeProducts = products.filter(p => p.active);
-  const alerts = getStockAlerts(activeProducts, branches, movements, minimums, settings.defaultMinStock);
-  const totalValue = inventoryValue(movements, activeProducts, branches);
+  const alerts = getStockAlerts(activeProducts, operatingBranches, movements, minimums, settings.defaultMinStock);
+  const totalValue = inventoryValue(movements, activeProducts, operatingBranches);
   const lastWeek = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const recentMovements = movements.filter(
-    m => new Date(m.date).getTime() >= lastWeek && branches.some(b => b.id === m.branchId),
+    m => new Date(m.date).getTime() >= lastWeek && operatingBranches.some(b => b.id === m.branchId),
   ).length;
 
   return (
@@ -48,7 +49,7 @@ export default function Dashboard({ profile }: { profile: UserProfile }) {
         <StatCard
           title="Productos activos"
           value={String(activeProducts.length)}
-          subtitle={`${branches.length} sucursal(es) visibles`}
+          subtitle={`${activeBranches.length} sucursal(es) visibles`}
           icon={<Boxes className="text-slate-700" />}
         />
         <StatCard
@@ -73,7 +74,7 @@ export default function Dashboard({ profile }: { profile: UserProfile }) {
               <tr className="border-b border-[#141414] font-mono text-xs uppercase opacity-60">
                 <th className="py-2">Código</th>
                 <th className="py-2">Producto</th>
-                {branches.map(b => (
+                {activeBranches.map(b => (
                   <th key={b.id} className="py-2 text-right">
                     {b.code}
                   </th>
@@ -83,14 +84,14 @@ export default function Dashboard({ profile }: { profile: UserProfile }) {
             </thead>
             <tbody className="font-mono">
               {activeProducts.map(p => {
-                const perBranch = branches.map(b => calculateStock(movements, p.id, b.id));
+                const perBranch = activeBranches.map(b => calculateStock(movements, p.id, b.id));
                 const total = perBranch.reduce((a, n) => a + n, 0);
                 return (
                   <tr key={p.id} className="border-b border-slate-200">
                     <td className="py-2">{p.code}</td>
                     <td className="py-2">{p.name}</td>
                     {perBranch.map((qty, i) => (
-                      <td key={branches[i].id} className="py-2 text-right">
+                      <td key={activeBranches[i].id} className="py-2 text-right">
                         {qty}
                       </td>
                     ))}
@@ -102,7 +103,7 @@ export default function Dashboard({ profile }: { profile: UserProfile }) {
               })}
               {activeProducts.length === 0 && (
                 <tr>
-                  <td colSpan={branches.length + 3} className="py-8 text-center opacity-50">
+                  <td colSpan={activeBranches.length + 3} className="py-8 text-center opacity-50">
                     No hay productos registrados
                   </td>
                 </tr>
